@@ -69,17 +69,14 @@ pip install -r requirements.txt
 
 ### 3. Configure the Bot
 
-1. Open `syscontrol_bot.py` in a text editor (like Nano or Notepad or VS Code).
-2. Find the **Configuration** section at the top:
-```python
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-BOT_PASSWORD = "YOUR_SECRET_PASSWORD"
-
+1. Create a new file named `.env` in the project root folder.
+2. Open `.env` with a text editor and add the following lines:
+```env
+TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+BOT_PASSWORD=YOUR_SECRET_PASSWORD
 ```
-
-
-3. Replace the `TOKEN` with your bot's API token from BotFather.
-4. Set a strong `BOT_PASSWORD` (you will need this to log in).
+3. Replace `YOUR_TELEGRAM_BOT_TOKEN` with your bot's Token from BotFather.
+4. Replace `YOUR_SECRET_PASSWORD` with a strong password of your choice.
 
 ---
 
