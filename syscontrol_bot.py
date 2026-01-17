@@ -7,22 +7,23 @@ import shutil
 import telebot
 import platform
 import subprocess
-import pyAesCrypt
 import threading
 import requests
 import pyperclip
 from gtts import gTTS
-from io import BytesIO
 from pathlib import Path
 from functools import wraps
 from tempfile import NamedTemporaryFile
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ==============================
 # CONFIGURATION
 # ==============================
 
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-BOT_PASSWORD = "YOUR_SECRET_PASSWORD"
+TOKEN = os.getenv("TOKEN")
+BOT_PASSWORD = os.getenv("BOT_PASSWORD")
 
 bot = telebot.TeleBot(TOKEN)
 OS = platform.system()  # 'Windows', 'Linux', 'Darwin'
